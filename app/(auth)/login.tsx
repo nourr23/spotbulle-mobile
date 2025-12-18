@@ -1,39 +1,38 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { useFormik } from 'formik';
 
-import { supabase } from '@/services/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
+import { SignInSchema } from '@/validation/signin-validation';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
+  const { signIn } = useAuth();
   const [loading, setLoading] = React.useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Erreur', 'Merci de remplir email et mot de passe.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        Alert.alert('Connexion échouée', error.message);
-        return;
+  const { values, errors, touched, handleChange, handleBlur, handleSubmit } = useFormik({
+    initialValues: { email: '', password: '' },
+    validationSchema: SignInSchema,
+    onSubmit: async (formValues) => {
+      try {
+        setLoading(true);
+        const { error } = await signIn(formValues.email, formValues.password);
+        if (error) {
+          console.log('[Mobile Login] Error during login:', error);
+          Alert.alert('Erreur', error.message || 'Connexion échouée');
+          return;
+        }
+        Alert.alert('Succès', 'Connexion réussie.');
+        router.replace('/(tabs)');
+      } catch (err: any) {
+        console.log('[Mobile Login] Unexpected error:', err);
+        Alert.alert('Erreur', err?.message || 'Erreur inconnue');
+      } finally {
+        setLoading(false);
       }
-
-      Alert.alert('Succès', 'Connexion réussie (test).');
-      // Later: redirect to tabs
-      router.replace('/(tabs)');
-    } catch (err: any) {
-      Alert.alert('Erreur', err?.message || 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   return (
     <View style={styles.container}>
@@ -45,20 +44,28 @@ export default function LoginScreen() {
         placeholderTextColor="#999"
         autoCapitalize="none"
         keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
+        value={values.email}
+        onChangeText={handleChange('email')}
+        onBlur={handleBlur('email')}
       />
+      {touched.email && errors.email ? (
+        <Text style={styles.error}>{errors.email}</Text>
+      ) : null}
 
       <TextInput
         style={styles.input}
         placeholder="Mot de passe"
         placeholderTextColor="#999"
         secureTextEntry
-        value={password}
-        onChangeText={setPassword}
+        value={values.password}
+        onChangeText={handleChange('password')}
+        onBlur={handleBlur('password')}
       />
+      {touched.password && errors.password ? (
+        <Text style={styles.error}>{errors.password}</Text>
+      ) : null}
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+      <TouchableOpacity style={styles.button} onPress={handleSubmit as any} disabled={loading}>
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
@@ -99,6 +106,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: '#e5e7eb',
     marginBottom: 12,
+  },
+  error: {
+    color: '#f97373',
+    fontSize: 12,
+    marginBottom: 8,
   },
   button: {
     backgroundColor: '#4f46e5',
