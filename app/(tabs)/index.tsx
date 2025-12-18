@@ -1,120 +1,269 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
 
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const cameraRef = useRef<CameraView | null>(null);
+
   const handleLogout = async () => {
     await signOut();
     router.replace('/(auth)/login');
   };
 
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <ThemedText type="defaultSemiBold">Logout (test)</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const permissionsGranted =
+    cameraPermission?.granted && micPermission?.granted;
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  // Log permissions whenever they change (and on initial render)
+  useEffect(() => {
+    console.log('[Mobile] Permissions state on render/update:', {
+      camera: cameraPermission,
+      mic: micPermission,
+      permissionsGranted,
+    });
+  }, [cameraPermission, micPermission, permissionsGranted]);
+
+  const handleRecordToggle = async () => {
+    console.log('[Mobile] Record button pressed', {
+      permissionsGranted,
+      isRecording,
+      hasCameraRef: !!cameraRef.current,
+    });
+
+    try {
+      // If no permissions yet, ask first, then user presses again to start
+      if (!permissionsGranted) {
+        await handleRequestPermissions();
+        return;
+      }
+
+      if (!cameraRef.current) {
+        console.warn('[Mobile] Camera ref is null, cannot record');
+        return;
+      }
+
+      if (isRecording) {
+        console.log('[Mobile] Stopping recording');
+        cameraRef.current.stopRecording();
+        setIsRecording(false);
+        return;
+      }
+
+      console.log('[Mobile] Starting recording');
+      setRecordedUri(null);
+      setIsRecording(true);
+
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 60,
+        quality: '720p',
+      });
+      console.log('[Mobile] Recording finished', video);
+      setRecordedUri(video?.uri ?? null);
+      setIsRecording(false);
+    } catch (e) {
+      console.warn('Recording error', e);
+      setIsRecording(false);
+    }
+  };
+
+  const handleRequestPermissions = async () => {
+    try {
+      console.log('[Mobile] Requesting permissions...', {
+        cameraBefore: cameraPermission,
+        micBefore: micPermission,
+      });
+      await requestCameraPermission();
+      await requestMicPermission();
+      console.log('[Mobile] Permissions after request', {
+        cameraAfter: cameraPermission,
+        micAfter: micPermission,
+      });
+    } catch (e) {
+      console.warn('Permission error', e);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Enregistrement vidéo</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>Déconnexion</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.cameraWrapper}>
+        {permissionsGranted ? (
+          <>
+            <CameraView
+              ref={cameraRef}
+              style={styles.camera}
+              facing="front"
+              mode="video"
+            />
+            {!isRecording && <View style={styles.cameraOverlay} />}
+          </>
+        ) : (
+          <View style={styles.cameraPlaceholder} />
+        )}
+      </View>
+
+      <View style={styles.bottomPanel}>
+        {recordedUri ? (
+          <Text style={styles.infoText}>Vidéo enregistrée (locale) : {recordedUri}</Text>
+        ) : (
+          <Text style={styles.infoText}>Aucune vidéo enregistrée pour le moment.</Text>
+        )}
+
+        <View style={styles.buttonRow}>
+          {!permissionsGranted ? (
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={handleRequestPermissions}
+            >
+              <Text style={styles.permissionText}>Autoriser caméra + micro</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.recordButton,
+                isRecording && styles.recordButtonActive,
+              ]}
+              onPress={handleRecordToggle}
+            >
+              <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#020617',
+    paddingHorizontal: 16,
+    paddingTop: 40,
+    paddingBottom: 24,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  title: {
+    color: '#f9fafb',
+    fontSize: 22,
+    fontWeight: '700',
   },
   logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#ef4444',
-    alignSelf: 'flex-start',
+    borderColor: '#f97373',
+  },
+  logoutText: {
+    color: '#fecaca',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cameraWrapper: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+  },
+  bottomPanel: {
+    marginTop: 16,
+    gap: 12,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  infoText: {
+    color: '#9ca3af',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  recordButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 40,
+    borderWidth: 4,
+    borderColor: '#f97373',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordButtonActive: {
+    borderColor: '#bef264',
+  },
+  recordButtonDisabled: {
+    opacity: 0.4,
+  },
+  recordInner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ef4444',
+  },
+  recordInnerActive: {
+    borderRadius: 8,
+    width: 36,
+    height: 36,
+    backgroundColor: '#22c55e',
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#020617',
+  },
+  centerText: {
+    color: '#e5e7eb',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  permissionButton: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#22c55e',
+  },
+  permissionText: {
+    color: '#0b1120',
+    fontWeight: '600',
   },
 });
