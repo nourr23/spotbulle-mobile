@@ -2,12 +2,13 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 
-import { supabase } from '@/services/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const { signUp } = useAuth();
   const [loading, setLoading] = React.useState(false);
 
   const handleRegister = async () => {
@@ -18,16 +19,16 @@ export default function RegisterScreen() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({ email, password });
-
+      const { error } = await signUp(email, password);
       if (error) {
-        Alert.alert('Inscription échouée', error.message);
+        console.log('[Mobile Register] Error during signup:', error);
+        Alert.alert('Erreur', error.message || 'Inscription échouée');
         return;
       }
-
-      Alert.alert('Succès', 'Compte créé (test). Vérifie ton email si la confirmation est activée.');
+      Alert.alert('Succès', 'Compte créé.');
       router.replace('/(auth)/login');
     } catch (err: any) {
+      console.log('[Mobile Register] Unexpected error:', err);
       Alert.alert('Erreur', err?.message || 'Erreur inconnue');
     } finally {
       setLoading(false);

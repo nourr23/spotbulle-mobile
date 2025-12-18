@@ -2,12 +2,13 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 
-import { supabase } from '@/services/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const { signIn } = useAuth();
   const [loading, setLoading] = React.useState(false);
 
   const handleLogin = async () => {
@@ -18,17 +19,16 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
+      const { error } = await signIn(email, password);
       if (error) {
-        Alert.alert('Connexion échouée', error.message);
+        console.log('[Mobile Login] Error during login:', error);
+        Alert.alert('Erreur', error.message || 'Connexion échouée');
         return;
       }
-
-      Alert.alert('Succès', 'Connexion réussie (test).');
-      // Later: redirect to tabs
+      Alert.alert('Succès', 'Connexion réussie.');
       router.replace('/(tabs)');
     } catch (err: any) {
+      console.log('[Mobile Login] Unexpected error:', err);
       Alert.alert('Erreur', err?.message || 'Erreur inconnue');
     } finally {
       setLoading(false);
