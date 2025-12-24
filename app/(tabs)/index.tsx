@@ -1,12 +1,13 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { decode } from 'base64-arraybuffer';
 
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/services/supabaseClient';
+import SuccessModal from '@/components/SuccessModal';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -16,11 +17,33 @@ export default function HomeScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const cameraRef = useRef<CameraView | null>(null);
 
   const permissionsGranted =
     cameraPermission?.granted && micPermission?.granted;
+
+  // Timer for recording
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setRecordingTime(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecording]);
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleRecordToggle = async () => {
     try {
@@ -41,7 +64,7 @@ export default function HomeScreen() {
       }
 
       setRecordedUri(null);
-      setUploadedFilePath(null); // Clear previous upload when starting new recording
+      setRecordingTime(0); // Reset timer
       setIsRecording(true);
 
       const video = await cameraRef.current.recordAsync({
@@ -109,8 +132,9 @@ export default function HomeScreen() {
       const publicUrl = urlData?.publicUrl || null;
 
       // Insert into database
+      const videoTitle = `Vidéo mobile ${new Date().toLocaleString('fr-FR')}`;
       const insertPayload = {
-        title: `Vidéo mobile ${new Date().toLocaleString('fr-FR')}`,
+        title: videoTitle,
         description: 'Vidéo enregistrée depuis le mobile',
         file_path: filePath,
         storage_path: filePath,
@@ -133,12 +157,11 @@ export default function HomeScreen() {
         throw new Error(`Erreur base de données: ${insertError.message || 'Impossible de créer la vidéo.'}`);
       }
 
-      return { success: true, filePath, publicUrl };
+      return { success: true, filePath, publicUrl, title: videoTitle };
     },
     onSuccess: (data) => {
-      Alert.alert('Succès', 'Vidéo sauvegardée sur SpotBulle.');
       setRecordedUri(null); // Clear recorded video after successful upload
-      setUploadedFilePath(data.filePath); // Store file path for download
+      setShowSuccessModal(true); // Show success modal
       // Invalidate videos query to refresh the list
       queryClient.invalidateQueries({ queryKey: ['videos', user?.id] });
     },
@@ -155,36 +178,6 @@ export default function HomeScreen() {
     uploadMutation.mutate(recordedUri);
   };
 
-  const handleDownload = async () => {
-    try {
-      if (!uploadedFilePath) {
-        Alert.alert('Test téléchargement', 'Aucun fichier à télécharger.');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .storage
-        .from('videos')
-        .download(uploadedFilePath);
-
-      if (error) {
-        Alert.alert(
-          'Erreur téléchargement',
-          error.message || 'Impossible de télécharger la vidéo.'
-        );
-        return;
-      }
-
-      if (!data) {
-        Alert.alert('Erreur téléchargement', 'Aucune donnée reçue.');
-        return;
-      }
-
-      Alert.alert('Succès', `Téléchargement OK (taille: ${data.size} octets).`);
-    } catch (e: any) {
-      Alert.alert('Erreur', e?.message || 'Erreur inconnue lors du téléchargement.');
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -202,6 +195,11 @@ export default function HomeScreen() {
               mode="video"
             />
             {!isRecording && <View style={styles.cameraOverlay} />}
+            {isRecording && (
+              <View style={styles.timerContainer}>
+                <Text style={styles.timerText}>{formatTime(recordingTime)}</Text>
+              </View>
+            )}
           </>
         ) : (
           <View style={styles.cameraPlaceholder} />
@@ -209,10 +207,12 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.bottomPanel}>
-        {recordedUri ? (
-          <Text style={styles.infoText}>Vidéo enregistrée (locale) : {recordedUri}</Text>
+        {isRecording ? (
+          <Text style={styles.infoText}>Enregistrement en cours...</Text>
+        ) : recordedUri ? (
+          <Text style={styles.infoText}>Vidéo enregistrée, prête à être sauvegardée.</Text>
         ) : (
-          <Text style={styles.infoText}>Aucune vidéo enregistrée pour le moment.</Text>
+          <Text style={styles.infoText}>Appuie sur le bouton pour commencer l'enregistrement</Text>
         )}
 
         <View style={styles.buttonRow}>
@@ -249,19 +249,17 @@ export default function HomeScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
-
-              {uploadedFilePath && !recordedUri && (
-                <TouchableOpacity
-                  style={styles.downloadButton}
-                  onPress={handleDownload}
-                >
-                  <Text style={styles.downloadButtonText}>⬇️ Télécharger</Text>
-                </TouchableOpacity>
-              )}
             </>
           )}
         </View>
       </View>
+
+      <SuccessModal
+        visible={showSuccessModal}
+        title="Vidéo sauvegardée !"
+        message="Ta vidéo a été enregistrée avec succès sur SpotBulle."
+        onClose={() => setShowSuccessModal(false)}
+      />
     </View>
   );
 }
@@ -305,6 +303,21 @@ const styles = StyleSheet.create({
   cameraOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000',
+  },
+  timerContainer: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  timerText: {
+    color: '#ef4444',
+    fontSize: 24,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   bottomPanel: {
     marginTop: 16,
@@ -383,20 +396,6 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#0b1120',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  downloadButton: {
-    marginLeft: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#22c55e',
-    backgroundColor: 'transparent',
-  },
-  downloadButtonText: {
-    color: '#22c55e',
     fontWeight: '600',
     fontSize: 14,
   },
