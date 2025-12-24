@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/services/supabaseClient';
@@ -12,10 +13,16 @@ type Video = {
 };
 
 export default function VideosTabScreen() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { signOut, user } = useAuth();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace('/(auth)/login');
+  };
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -33,14 +40,12 @@ export default function VideosTabScreen() {
           .order('created_at', { ascending: false });
 
         if (dbError) {
-          console.log('[Mobile] Error loading videos', dbError);
           setError(dbError.message);
           return;
         }
 
         setVideos((data || []) as Video[]);
       } catch (e: any) {
-        console.log('[Mobile] Unexpected videos load error', e);
         setError(e?.message || 'Erreur inconnue');
       } finally {
         setLoading(false);
@@ -87,7 +92,12 @@ export default function VideosTabScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mes vidéos (test)</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Mes vidéos</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>Déconnexion</Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={videos}
         keyExtractor={(item) => item.id}
@@ -112,11 +122,28 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingHorizontal: 16,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   title: {
     color: '#f9fafb',
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 12,
+  },
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#f97373',
+  },
+  logoutText: {
+    color: '#fecaca',
+    fontSize: 12,
+    fontWeight: '600',
   },
   center: {
     flex: 1,

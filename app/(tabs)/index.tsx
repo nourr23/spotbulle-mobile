@@ -1,7 +1,6 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { decode } from 'base64-arraybuffer';
@@ -10,8 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/services/supabaseClient';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -21,30 +19,10 @@ export default function HomeScreen() {
   const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
 
-  const handleLogout = async () => {
-    await signOut();
-    router.replace('/(auth)/login');
-  };
-
   const permissionsGranted =
     cameraPermission?.granted && micPermission?.granted;
 
-  // Log permissions whenever they change (and on initial render)
-  useEffect(() => {
-    console.log('[Mobile] Permissions state on render/update:', {
-      camera: cameraPermission,
-      mic: micPermission,
-      permissionsGranted,
-    });
-  }, [cameraPermission, micPermission, permissionsGranted]);
-
   const handleRecordToggle = async () => {
-    console.log('[Mobile] Record button pressed', {
-      permissionsGranted,
-      isRecording,
-      hasCameraRef: !!cameraRef.current,
-    });
-
     try {
       // If no permissions yet, ask first, then user presses again to start
       if (!permissionsGranted) {
@@ -53,18 +31,15 @@ export default function HomeScreen() {
       }
 
       if (!cameraRef.current) {
-        console.warn('[Mobile] Camera ref is null, cannot record');
         return;
       }
 
       if (isRecording) {
-        console.log('[Mobile] Stopping recording');
         cameraRef.current.stopRecording();
         setIsRecording(false);
         return;
       }
 
-      console.log('[Mobile] Starting recording');
       setRecordedUri(null);
       setUploadedFilePath(null); // Clear previous upload when starting new recording
       setIsRecording(true);
@@ -73,29 +48,19 @@ export default function HomeScreen() {
         maxDuration: 60,
         quality: '720p',
       });
-      console.log('[Mobile] Recording finished', video);
       setRecordedUri(video?.uri ?? null);
       setIsRecording(false);
     } catch (e) {
-      console.warn('Recording error', e);
       setIsRecording(false);
     }
   };
 
   const handleRequestPermissions = async () => {
     try {
-      console.log('[Mobile] Requesting permissions...', {
-        cameraBefore: cameraPermission,
-        micBefore: micPermission,
-      });
       await requestCameraPermission();
       await requestMicPermission();
-      console.log('[Mobile] Permissions after request', {
-        cameraAfter: cameraPermission,
-        micAfter: micPermission,
-      });
     } catch (e) {
-      console.warn('Permission error', e);
+      // Silent fail
     }
   };
 
@@ -107,15 +72,12 @@ export default function HomeScreen() {
 
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session?.user) {
-        console.log('[Mobile] Upload: user/session error', error);
         throw new Error('Session non valide, veuillez vous reconnecter');
       }
 
       const userId = session.user.id;
-      console.log('[Mobile] Upload: user id', userId);
 
       // Convert local URI to ArrayBuffer (like sawer-bel-akhdher does)
-      console.log('[Mobile] Reading video file as base64...');
       const base64 = await FileSystem.readAsStringAsync(videoUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
@@ -124,8 +86,6 @@ export default function HomeScreen() {
       const fileExt = 'mp4';
       const fileName = `mobile-${Date.now()}.${fileExt}`;
       const filePath = `videos/${userId}/${fileName}`;
-
-      console.log('[Mobile] Upload: starting upload to', filePath, 'size', arrayBuffer.byteLength);
 
       // Upload to storage using ArrayBuffer (like sawer-bel-akhdher)
       const { error: uploadError } = await supabase
@@ -137,7 +97,6 @@ export default function HomeScreen() {
         });
 
       if (uploadError) {
-        console.log('[Mobile] Upload error (full)', JSON.stringify(uploadError, null, 2));
         throw new Error(`Erreur upload: ${uploadError.message || 'Impossible de sauvegarder la vidéo.'}`);
       }
 
@@ -148,7 +107,6 @@ export default function HomeScreen() {
         .getPublicUrl(filePath);
 
       const publicUrl = urlData?.publicUrl || null;
-      console.log('[Mobile] Upload: public URL', publicUrl);
 
       // Insert into database
       const insertPayload = {
@@ -172,7 +130,6 @@ export default function HomeScreen() {
         .insert(insertPayload);
 
       if (insertError) {
-        console.log('[Mobile] Insert error', insertError);
         throw new Error(`Erreur base de données: ${insertError.message || 'Impossible de créer la vidéo.'}`);
       }
 
@@ -186,7 +143,6 @@ export default function HomeScreen() {
       queryClient.invalidateQueries({ queryKey: ['videos', user?.id] });
     },
     onError: (error: Error) => {
-      console.log('[Mobile] Upload mutation error', error);
       Alert.alert('Erreur', error.message || 'Erreur inconnue lors de la sauvegarde.');
     },
   });
@@ -206,15 +162,12 @@ export default function HomeScreen() {
         return;
       }
 
-      console.log('[Mobile] Test download for file_path:', uploadedFilePath);
-
       const { data, error } = await supabase
         .storage
         .from('videos')
         .download(uploadedFilePath);
 
       if (error) {
-        console.log('[Mobile] Test download error (full)', JSON.stringify(error, null, 2));
         Alert.alert(
           'Erreur téléchargement',
           error.message || 'Impossible de télécharger la vidéo.'
@@ -227,10 +180,8 @@ export default function HomeScreen() {
         return;
       }
 
-      console.log('[Mobile] Test download success, size:', data.size);
       Alert.alert('Succès', `Téléchargement OK (taille: ${data.size} octets).`);
     } catch (e: any) {
-      console.log('[Mobile] Unexpected download test error', e);
       Alert.alert('Erreur', e?.message || 'Erreur inconnue lors du téléchargement.');
     }
   };
@@ -239,9 +190,6 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Enregistrement vidéo</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Déconnexion</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.cameraWrapper}>
@@ -336,18 +284,6 @@ const styles = StyleSheet.create({
     color: '#f9fafb',
     fontSize: 22,
     fontWeight: '700',
-  },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#f97373',
-  },
-  logoutText: {
-    color: '#fecaca',
-    fontSize: 12,
-    fontWeight: '600',
   },
   cameraWrapper: {
     flex: 1,
