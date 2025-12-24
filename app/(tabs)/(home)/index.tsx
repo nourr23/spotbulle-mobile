@@ -1,12 +1,11 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import * as FileSystem from 'expo-file-system';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { decode } from 'base64-arraybuffer';
 
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/services/supabaseClient';
+import { uploadVideo } from '@/services/api/upload/video';
 import SuccessModal from '@/components/SuccessModal';
 
 export default function HomeScreen() {
@@ -98,66 +97,10 @@ export default function HomeScreen() {
         throw new Error('Session non valide, veuillez vous reconnecter');
       }
 
-      const userId = session.user.id;
-
-      // Convert local URI to ArrayBuffer (like sawer-bel-akhdher does)
-      const base64 = await FileSystem.readAsStringAsync(videoUri, {
-        encoding: FileSystem.EncodingType.Base64,
+      return await uploadVideo({
+        videoUri,
+        userId: session.user.id,
       });
-      const arrayBuffer = decode(base64);
-
-      const fileExt = 'mp4';
-      const fileName = `mobile-${Date.now()}.${fileExt}`;
-      const filePath = `videos/${userId}/${fileName}`;
-
-      // Upload to storage using ArrayBuffer (like sawer-bel-akhdher)
-      const { error: uploadError } = await supabase
-        .storage
-        .from('videos')
-        .upload(filePath, arrayBuffer, {
-          contentType: 'video/mp4',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw new Error(`Erreur upload: ${uploadError.message || 'Impossible de sauvegarder la vidéo.'}`);
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase
-        .storage
-        .from('videos')
-        .getPublicUrl(filePath);
-
-      const publicUrl = urlData?.publicUrl || null;
-
-      // Insert into database
-      const videoTitle = `Vidéo mobile ${new Date().toLocaleString('fr-FR')}`;
-      const insertPayload = {
-        title: videoTitle,
-        description: 'Vidéo enregistrée depuis le mobile',
-        file_path: filePath,
-        storage_path: filePath,
-        file_size: arrayBuffer.byteLength,
-        duration: null,
-        user_id: userId,
-        status: 'uploaded',
-        public_url: publicUrl,
-        video_url: publicUrl,
-        format: fileExt,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: insertError } = await supabase
-        .from('videos')
-        .insert(insertPayload);
-
-      if (insertError) {
-        throw new Error(`Erreur base de données: ${insertError.message || 'Impossible de créer la vidéo.'}`);
-      }
-
-      return { success: true, filePath, publicUrl, title: videoTitle };
     },
     onSuccess: (data) => {
       setRecordedUri(null); // Clear recorded video after successful upload
@@ -225,15 +168,17 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ) : (
             <>
-              <TouchableOpacity
-                style={[
-                  styles.recordButton,
-                  isRecording && styles.recordButtonActive,
-                ]}
-                onPress={handleRecordToggle}
-              >
-                <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
-              </TouchableOpacity>
+              {!uploadMutation.isPending && (
+                <TouchableOpacity
+                  style={[
+                    styles.recordButton,
+                    isRecording && styles.recordButtonActive,
+                  ]}
+                  onPress={handleRecordToggle}
+                >
+                  <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
+                </TouchableOpacity>
+              )}
 
               {recordedUri && (
                 <TouchableOpacity
