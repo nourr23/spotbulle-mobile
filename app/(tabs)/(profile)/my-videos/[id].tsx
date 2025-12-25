@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -148,10 +149,13 @@ export default function VideoDetailsScreen() {
       {video.video_url && (
         <View style={styles.videoSection}>
           <Text style={styles.sectionTitle}>Vidéo</Text>
-          <View style={styles.videoPlaceholder}>
-            <Text style={styles.videoPlaceholderText}>🎬</Text>
-            <Text style={styles.videoPlaceholderSubtext}>Lecteur vidéo</Text>
-          </View>
+          <Video
+            source={{ uri: video.video_url }}
+            style={styles.videoPlayer}
+            useNativeControls
+            resizeMode={ResizeMode.CONTAIN}
+            isLooping={false}
+          />
         </View>
       )}
 
@@ -265,21 +269,12 @@ const styles = StyleSheet.create({
   videoSection: {
     marginBottom: 24,
   },
-  videoPlaceholder: {
+  videoPlayer: {
+    width: '100%',
     height: 200,
-    backgroundColor: '#111827',
+    backgroundColor: '#000',
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 8,
-  },
-  videoPlaceholderText: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  videoPlaceholderSubtext: {
-    color: '#6b7280',
-    fontSize: 14,
   },
   sectionTitle: {
     color: '#f9fafb',
