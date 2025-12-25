@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { deleteVideo } from '@/services/api/videos/delete';
 import { getVideoById } from '@/services/api/videos/getById';
 import { supabase } from '@/services/supabaseClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ResizeMode, Video } from 'expo-av';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function VideoDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -112,6 +113,47 @@ export default function VideoDetailsScreen() {
     analyzeMutation.mutate();
   };
 
+  const deleteMutation = useMutation({
+    mutationFn: () => {
+      if (!video || !user) {
+        throw new Error('Données manquantes');
+      }
+      return deleteVideo({ videoId: video.id, userId: user.id });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['videos', user?.id] });
+      Alert.alert('Succès', 'Vidéo supprimée avec succès', [
+        {
+          text: 'OK',
+          onPress: () => router.back(),
+        },
+      ]);
+    },
+    onError: (error: Error) => {
+      Alert.alert('Erreur', error.message || 'Erreur lors de la suppression');
+    },
+  });
+
+  const handleDelete = () => {
+    if (!video) return;
+
+    Alert.alert(
+      'Supprimer la vidéo',
+      `Êtes-vous sûr de vouloir supprimer "${video.title || 'cette vidéo'}" ? Cette action est irréversible.`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => deleteMutation.mutate(),
+        },
+      ]
+    );
+  };
+
   if (isLoading) {
     return (
       <View style={styles.center}>
@@ -166,7 +208,7 @@ export default function VideoDetailsScreen() {
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreLabel}>Score IA</Text>
               <Text style={styles.scoreValue}>
-                {(video.ai_score * 10).toFixed(1)}/10
+                {(video.ai_score * 10).toFixed(1)}/100
               </Text>
             </View>
           )}
@@ -217,6 +259,18 @@ export default function VideoDetailsScreen() {
           <Text style={styles.transcriptionText}>{video.transcription_text}</Text>
         </View>
       )}
+
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={handleDelete}
+        disabled={deleteMutation.isPending}
+      >
+        {deleteMutation.isPending ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.deleteButtonText}>🗑️ Supprimer</Text>
+        )}
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -265,6 +319,19 @@ const styles = StyleSheet.create({
   status: {
     color: '#9ca3af',
     fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   videoSection: {
     marginBottom: 24,
