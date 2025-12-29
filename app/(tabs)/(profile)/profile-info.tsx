@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, TextInput, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { getSymbolicProfile, type SymbolicProfile } from '@/services/api/profile/getSymbolic';
@@ -10,10 +11,12 @@ export default function ProfileInfoScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [birthTime, setBirthTime] = useState<Date | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    birthDate: '',
-    birthTime: '',
     birthCity: '',
     latitude: '',
     longitude: '',
@@ -39,7 +42,7 @@ export default function ProfileInfoScreen() {
       const latitude = parseFloat(formData.latitude);
       const longitude = parseFloat(formData.longitude);
 
-      if (!formData.name || !formData.birthDate || !formData.birthTime || !formData.latitude || !formData.longitude || !formData.timezone) {
+      if (!formData.name || !birthDate || !birthTime || !formData.latitude || !formData.longitude || !formData.timezone) {
         throw new Error('Tous les champs sont requis');
       }
 
@@ -47,11 +50,19 @@ export default function ProfileInfoScreen() {
         throw new Error('Latitude et longitude doivent être des nombres valides');
       }
 
+      // Format date as YYYY-MM-DD
+      const formattedDate = birthDate.toISOString().split('T')[0];
+      
+      // Format time as HH:MM
+      const hours = birthTime.getHours().toString().padStart(2, '0');
+      const minutes = birthTime.getMinutes().toString().padStart(2, '0');
+      const formattedTime = `${hours}:${minutes}`;
+
       return createSymbolicProfile({
         name: formData.name,
         birth: {
-          date: formData.birthDate,
-          time: formData.birthTime,
+          date: formattedDate,
+          time: formattedTime,
           city: formData.birthCity || undefined,
           latitude,
           longitude,
@@ -203,24 +214,64 @@ export default function ProfileInfoScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Date de naissance *</Text>
-            <TextInput
+            <TouchableOpacity
               style={styles.input}
-              value={formData.birthDate}
-              onChangeText={(text) => setFormData({ ...formData, birthDate: text })}
-              placeholder="YYYY-MM-DD (ex: 1990-05-15)"
-              placeholderTextColor="#6b7280"
-            />
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={[styles.inputText, !birthDate && styles.placeholderText]}>
+                {birthDate
+                  ? birthDate.toLocaleDateString('fr-FR', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                    })
+                  : 'Sélectionner la date'}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={birthDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setBirthDate(selectedDate);
+                  }
+                }}
+                maximumDate={new Date()}
+              />
+            )}
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Heure de naissance *</Text>
-            <TextInput
+            <TouchableOpacity
               style={styles.input}
-              value={formData.birthTime}
-              onChangeText={(text) => setFormData({ ...formData, birthTime: text })}
-              placeholder="HH:MM (ex: 14:30)"
-              placeholderTextColor="#6b7280"
-            />
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Text style={[styles.inputText, !birthTime && styles.placeholderText]}>
+                {birthTime
+                  ? birthTime.toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : 'Sélectionner l\'heure'}
+              </Text>
+            </TouchableOpacity>
+            {showTimePicker && (
+              <DateTimePicker
+                value={birthTime || new Date()}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(Platform.OS === 'ios');
+                  if (selectedTime) {
+                    setBirthTime(selectedTime);
+                  }
+                }}
+              />
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -274,10 +325,10 @@ export default function ProfileInfoScreen() {
               style={styles.cancelButton}
               onPress={() => {
                 setShowForm(false);
+                setBirthDate(null);
+                setBirthTime(null);
                 setFormData({
                   name: '',
-                  birthDate: '',
-                  birthTime: '',
                   birthCity: '',
                   latitude: '',
                   longitude: '',
@@ -592,8 +643,15 @@ const styles = StyleSheet.create({
     borderColor: '#1f2937',
     borderRadius: 12,
     padding: 14,
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  inputText: {
     color: '#f9fafb',
     fontSize: 16,
+  },
+  placeholderText: {
+    color: '#6b7280',
   },
   formActions: {
     flexDirection: 'row',
