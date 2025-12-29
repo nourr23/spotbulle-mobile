@@ -6,11 +6,11 @@ import { useAuth } from '@/context/AuthContext';
 import { getSymbolicProfile, type SymbolicProfile } from '@/services/api/profile/getSymbolic';
 import { deleteSymbolicProfile } from '@/services/api/profile/deleteSymbolic';
 import { createSymbolicProfile } from '@/services/api/profile/createSymbolic';
+import CityAutocomplete from '@/components/CityAutocomplete';
 
 export default function ProfileInfoScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -169,28 +169,7 @@ export default function ProfileInfoScreen() {
     );
   }
 
-  if (!profile && !showForm) {
-    return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.center}>
-          <Text style={styles.centerText}>
-            Aucun profil symbolique disponible pour le moment.
-          </Text>
-          <Text style={[styles.centerText, { marginTop: 8, fontSize: 12, marginBottom: 24 }]}>
-            Crée ton profil symbolique en remplissant le formulaire ci-dessous.
-          </Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => setShowForm(true)}
-          >
-            <Text style={styles.createButtonText}>✨ Créer mon profil symbolique</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (showForm && !profile) {
+  if (!profile) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
@@ -209,6 +188,7 @@ export default function ProfileInfoScreen() {
               onChangeText={(text) => setFormData({ ...formData, name: text })}
               placeholder="Ex: Alex Dupont"
               placeholderTextColor="#6b7280"
+              selectionColor="#22c55e"
             />
           </View>
 
@@ -276,69 +256,62 @@ export default function ProfileInfoScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Ville de naissance</Text>
-            <TextInput
-              style={styles.input}
+            <CityAutocomplete
               value={formData.birthCity}
-              onChangeText={(text) => setFormData({ ...formData, birthCity: text })}
-              placeholder="Ex: Paris"
-              placeholderTextColor="#6b7280"
+              onChange={(city) => {
+                // Only update city, don't touch other fields
+                setFormData((prev) => ({ ...prev, birthCity: city }));
+              }}
+              onCoordinatesChange={({ latitude, longitude }) => {
+                // Update coordinates without affecting city name
+                setFormData((prev) => ({
+                  ...prev,
+                  latitude: latitude.toString(),
+                  longitude: longitude.toString(),
+                }));
+              }}
+              onTimezoneChange={(timezone) => {
+                // Update timezone without affecting other fields
+                setFormData((prev) => ({ ...prev, timezone }));
+              }}
+              placeholder="Ex: Paris, France"
             />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Latitude *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, styles.inputDisabled]}
               value={formData.latitude}
-              onChangeText={(text) => setFormData({ ...formData, latitude: text })}
-              placeholder="Ex: 48.8566"
+              placeholder="Sera rempli automatiquement"
               placeholderTextColor="#6b7280"
-              keyboardType="numeric"
+              editable={false}
             />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Longitude *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, styles.inputDisabled]}
               value={formData.longitude}
-              onChangeText={(text) => setFormData({ ...formData, longitude: text })}
-              placeholder="Ex: 2.3522"
+              placeholder="Sera rempli automatiquement"
               placeholderTextColor="#6b7280"
-              keyboardType="numeric"
+              editable={false}
             />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Fuseau horaire *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, styles.inputDisabled]}
               value={formData.timezone}
-              onChangeText={(text) => setFormData({ ...formData, timezone: text })}
-              placeholder="Ex: Europe/Paris"
+              placeholder="Sera rempli automatiquement"
               placeholderTextColor="#6b7280"
+              editable={false}
             />
           </View>
 
           <View style={styles.formActions}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setShowForm(false);
-                setBirthDate(null);
-                setBirthTime(null);
-                setFormData({
-                  name: '',
-                  birthCity: '',
-                  latitude: '',
-                  longitude: '',
-                  timezone: '',
-                });
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Annuler</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.submitButton, createMutation.isPending && styles.submitButtonDisabled]}
               onPress={() => createMutation.mutate()}
@@ -645,6 +618,7 @@ const styles = StyleSheet.create({
     padding: 14,
     justifyContent: 'center',
     minHeight: 50,
+    color: '#f9fafb',
   },
   inputText: {
     color: '#f9fafb',
@@ -654,30 +628,19 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   formActions: {
-    flexDirection: 'row',
-    gap: 12,
     marginTop: 8,
   },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#1f2937',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#f9fafb',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   submitButton: {
-    flex: 1,
+    width: '100%',
     backgroundColor: '#22c55e',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  inputDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#0f172a',
   },
   submitButtonDisabled: {
     opacity: 0.5,
