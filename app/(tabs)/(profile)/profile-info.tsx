@@ -1,13 +1,24 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, TextInput, Platform } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { getSymbolicProfile, type SymbolicProfile } from '@/services/api/profile/getSymbolic';
 import { deleteSymbolicProfile } from '@/services/api/profile/deleteSymbolic';
+import { createSymbolicProfile } from '@/services/api/profile/createSymbolic';
 
 export default function ProfileInfoScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    birthDate: '',
+    birthTime: '',
+    birthCity: '',
+    latitude: '',
+    longitude: '',
+    timezone: '',
+  });
 
   const {
     data: profile,
@@ -17,6 +28,45 @@ export default function ProfileInfoScreen() {
     queryKey: ['symbolic-profile', user?.id],
     enabled: !!user,
     queryFn: () => getSymbolicProfile({ userId: user!.id }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () => {
+      if (!user) {
+        throw new Error('Utilisateur non connecté');
+      }
+
+      const latitude = parseFloat(formData.latitude);
+      const longitude = parseFloat(formData.longitude);
+
+      if (!formData.name || !formData.birthDate || !formData.birthTime || !formData.latitude || !formData.longitude || !formData.timezone) {
+        throw new Error('Tous les champs sont requis');
+      }
+
+      if (isNaN(latitude) || isNaN(longitude)) {
+        throw new Error('Latitude et longitude doivent être des nombres valides');
+      }
+
+      return createSymbolicProfile({
+        name: formData.name,
+        birth: {
+          date: formData.birthDate,
+          time: formData.birthTime,
+          city: formData.birthCity || undefined,
+          latitude,
+          longitude,
+          timezone: formData.timezone,
+        },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['symbolic-profile', user?.id] });
+      setShowForm(false);
+      Alert.alert('Succès', 'Profil symbolique créé avec succès');
+    },
+    onError: (error: Error) => {
+      Alert.alert('Erreur', error.message || 'Erreur lors de la création du profil');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -108,16 +158,150 @@ export default function ProfileInfoScreen() {
     );
   }
 
-  if (!profile) {
+  if (!profile && !showForm) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.centerText}>
-          Aucun profil symbolique disponible pour le moment.
-        </Text>
-        <Text style={[styles.centerText, { marginTop: 8, fontSize: 12 }]}>
-          Génère ton profil symbolique depuis l'application web.
-        </Text>
-      </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.center}>
+          <Text style={styles.centerText}>
+            Aucun profil symbolique disponible pour le moment.
+          </Text>
+          <Text style={[styles.centerText, { marginTop: 8, fontSize: 12, marginBottom: 24 }]}>
+            Crée ton profil symbolique en remplissant le formulaire ci-dessous.
+          </Text>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => setShowForm(true)}
+          >
+            <Text style={styles.createButtonText}>✨ Créer mon profil symbolique</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  if (showForm && !profile) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Créer un profil symbolique</Text>
+          <Text style={styles.subtitle}>
+            Renseigne les informations de naissance pour générer ton profil
+          </Text>
+        </View>
+
+        <View style={styles.formContainer}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Nom *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.name}
+              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              placeholder="Ex: Alex Dupont"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Date de naissance *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.birthDate}
+              onChangeText={(text) => setFormData({ ...formData, birthDate: text })}
+              placeholder="YYYY-MM-DD (ex: 1990-05-15)"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Heure de naissance *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.birthTime}
+              onChangeText={(text) => setFormData({ ...formData, birthTime: text })}
+              placeholder="HH:MM (ex: 14:30)"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Ville de naissance</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.birthCity}
+              onChangeText={(text) => setFormData({ ...formData, birthCity: text })}
+              placeholder="Ex: Paris"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Latitude *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.latitude}
+              onChangeText={(text) => setFormData({ ...formData, latitude: text })}
+              placeholder="Ex: 48.8566"
+              placeholderTextColor="#6b7280"
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Longitude *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.longitude}
+              onChangeText={(text) => setFormData({ ...formData, longitude: text })}
+              placeholder="Ex: 2.3522"
+              placeholderTextColor="#6b7280"
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Fuseau horaire *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.timezone}
+              onChangeText={(text) => setFormData({ ...formData, timezone: text })}
+              placeholder="Ex: Europe/Paris"
+              placeholderTextColor="#6b7280"
+            />
+          </View>
+
+          <View style={styles.formActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setShowForm(false);
+                setFormData({
+                  name: '',
+                  birthDate: '',
+                  birthTime: '',
+                  birthCity: '',
+                  latitude: '',
+                  longitude: '',
+                  timezone: '',
+                });
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Annuler</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.submitButton, createMutation.isPending && styles.submitButtonDisabled]}
+              onPress={() => createMutation.mutate()}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? (
+                <ActivityIndicator color="#0b1120" />
+              ) : (
+                <Text style={styles.submitButtonText}>✨ Générer le profil</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -376,6 +560,72 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createButton: {
+    backgroundColor: '#22c55e',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  createButtonText: {
+    color: '#0b1120',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  formContainer: {
+    gap: 16,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  inputLabel: {
+    color: '#f9fafb',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  input: {
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    borderRadius: 12,
+    padding: 14,
+    color: '#f9fafb',
+    fontSize: 16,
+  },
+  formActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#1f2937',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#f9fafb',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: '#22c55e',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    color: '#0b1120',
     fontSize: 16,
     fontWeight: '600',
   },
