@@ -20,6 +20,14 @@ export default function Layout() {
           headerTintColor: '#f9fafb',
         }} 
       />
+      <Stack.Screen 
+        name="profile-info" 
+        options={{ 
+          title: 'Symbolique',
+          headerStyle: { backgroundColor: '#020617' },
+          headerTintColor: '#f9fafb',
+        }} 
+      />
     </Stack>
   );
 }

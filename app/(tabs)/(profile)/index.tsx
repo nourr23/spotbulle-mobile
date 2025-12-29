@@ -31,6 +31,14 @@ export default function ProfileScreen() {
           <IconSymbol name="play.rectangle.fill" size={24} color="#0b1120" />
           <Text style={styles.buttonText}>Mes vidéos</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.push('/(tabs)/(profile)/profile-info')}
+        >
+          <IconSymbol name="person.fill" size={24} color="#0b1120" />
+          <Text style={styles.buttonText}>Symbolique</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
