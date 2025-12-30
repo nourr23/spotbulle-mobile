@@ -329,7 +329,7 @@ export default function FutureJobsScreen() {
             </Text>
           </View>
 
-          <ScrollView style={styles.jobsScroll}>
+          <ScrollView style={styles.jobsScroll} nestedScrollEnabled>
             {jobs.map((job, index) => (
               <TouchableOpacity
                 key={index}
@@ -419,6 +419,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 40,
     paddingBottom: 32,
   },
   existingSection: {
@@ -556,7 +557,8 @@ const styles = StyleSheet.create({
     borderColor: '#475569',
   },
   jobsScroll: {
-    maxHeight: 500,
+    maxHeight: 400,
+    marginVertical: 16,
   },
   jobCard: {
     backgroundColor: '#1e293b',

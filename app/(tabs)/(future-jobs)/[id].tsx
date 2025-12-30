@@ -250,7 +250,7 @@ export default function JobConversationScreen() {
           style={styles.input}
           value={messageInput}
           onChangeText={setMessageInput}
-          placeholder="Pose une question à Spot Coach sur ce métier..."
+          placeholder="Pose une question..."
           placeholderTextColor="#9ca3af"
           multiline
           maxLength={500}
@@ -290,6 +290,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    paddingTop: 40,
     borderBottomWidth: 1,
     borderBottomColor: '#1e293b',
     gap: 12,
@@ -353,6 +354,7 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     padding: 16,
+    paddingTop: 40,
     paddingBottom: 8,
   },
   infoBox: {
@@ -422,7 +424,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1e293b',
     gap: 12,
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
@@ -431,6 +433,7 @@ const styles = StyleSheet.create({
     padding: 12,
     color: '#f9fafb',
     fontSize: 14,
+    minHeight: 48,
     maxHeight: 100,
     borderWidth: 1,
     borderColor: '#475569',
