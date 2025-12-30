@@ -68,7 +68,7 @@ export default function HomeScreen() {
 
       const video = await cameraRef.current.recordAsync({
         maxDuration: 60,
-        quality: '720p',
+        quality: '480p', // Lower quality to reduce file size and avoid Whisper 25MB limit
       });
       setRecordedUri(video?.uri ?? null);
       setIsRecording(false);
