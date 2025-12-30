@@ -20,6 +20,7 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'play.rectangle.fill': 'video-library',
   'person.fill': 'person',
+  'briefcase.fill': 'work',
 } as IconMapping;
 
 /**
