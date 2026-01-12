@@ -5,6 +5,7 @@ import { checkVideoProfileInformation } from '@/services/api/videos/checkProfile
 import AgeSelector from '@/components/lumi/AgeSelector';
 import QuestionCard, { Question } from '@/components/lumi/QuestionCard';
 import ProgressIndicator from '@/components/lumi/ProgressIndicator';
+import ProfileDisplay, { LumiProfile } from '@/components/lumi/ProfileDisplay';
 import { startLumiSession, submitAnswer, computeProfile, getLumiProfile } from '@/services/api/lumi';
 
 export default function DiscScreen() {
@@ -22,7 +23,7 @@ export default function DiscScreen() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [computingProfile, setComputingProfile] = useState(false);
-  const [computedProfile, setComputedProfile] = useState<any | null>(null);
+  const [computedProfile, setComputedProfile] = useState<LumiProfile | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
@@ -35,11 +36,36 @@ export default function DiscScreen() {
     return null;
   };
 
-  // Check for age in video profile information
+  // Check for existing profile first
+  useEffect(() => {
+    const checkExistingProfile = async () => {
+      if (!user?.id) {
+        setCheckingAge(false);
+        return;
+      }
+
+      try {
+        const result = await getLumiProfile({ userId: user.id });
+        if (result.success && result.profile) {
+          // Profile exists, skip age selection
+          setComputedProfile(result.profile as LumiProfile);
+          setCheckingAge(false);
+          hasCheckedVideoAge.current = true;
+          return;
+        }
+      } catch (error) {
+        console.error('[DiscScreen] Error checking existing profile:', error);
+      }
+    };
+
+    checkExistingProfile();
+  }, [user?.id]);
+
+  // Check for age in video profile information (only if no profile exists)
   useEffect(() => {
     const checkAge = async () => {
-      // Only check once on mount, and don't overwrite if user already selected
-      if (hasCheckedVideoAge.current || ageRange !== null) {
+      // Skip if profile already exists or already checked
+      if (computedProfile || hasCheckedVideoAge.current || ageRange !== null) {
         return;
       }
 
@@ -72,7 +98,7 @@ export default function DiscScreen() {
     };
 
     checkAge();
-  }, [user?.id, ageRange]);
+  }, [user?.id, ageRange, computedProfile]);
 
   const handleAgeSelect = (selectedAgeRange: string) => {
     setAgeRange(selectedAgeRange);
@@ -115,25 +141,6 @@ export default function DiscScreen() {
     startSession();
   }, [ageRange, sessionId, user?.id, computedProfile]);
 
-  // Check for existing profile
-  useEffect(() => {
-    const checkExistingProfile = async () => {
-      if (!user?.id || computedProfile) {
-        return;
-      }
-
-      try {
-        const result = await getLumiProfile({ userId: user.id });
-        if (result.success && result.profile) {
-          setComputedProfile(result.profile);
-        }
-      } catch (error) {
-        console.error('[DiscScreen] Error checking existing profile:', error);
-      }
-    };
-
-    checkExistingProfile();
-  }, [user?.id, computedProfile]);
 
   const handleSubmitAnswer = async () => {
     if (!sessionId || !currentQuestion) {
@@ -180,7 +187,7 @@ export default function DiscScreen() {
           const profileResult = await computeProfile({ session_id: sessionId });
 
           if (profileResult.success && profileResult.profile) {
-            setComputedProfile(profileResult.profile);
+            setComputedProfile(profileResult.profile as LumiProfile);
             setCurrentQuestion(null);
           } else {
             Alert.alert(
@@ -216,21 +223,21 @@ export default function DiscScreen() {
         </Text>
       </View>
 
-      {checkingAge && (
+      {checkingAge && !computedProfile && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#22c55e" />
           <Text style={styles.loadingText}>Vérification de votre âge...</Text>
         </View>
       )}
 
-      {!checkingAge && showAgeSelection && (
+      {!checkingAge && !computedProfile && showAgeSelection && (
         <AgeSelector
           selectedAgeRange={ageRange}
           onSelect={handleAgeSelect}
         />
       )}
 
-      {!checkingAge && !showAgeSelection && ageRange && !currentQuestion && !computedProfile && loading && (
+      {!checkingAge && !computedProfile && !showAgeSelection && ageRange && !currentQuestion && loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#22c55e" />
           <Text style={styles.loadingText}>Démarrage de la session...</Text>
@@ -282,17 +289,7 @@ export default function DiscScreen() {
 
       {/* Profile Results */}
       {computedProfile && (
-        <View style={styles.profileContainer}>
-          <Text style={styles.profileTitle}>Votre Profil DISC</Text>
-          <Text style={styles.profileSubtitle}>
-            {computedProfile.dominant_color && computedProfile.secondary_color
-              ? `${computedProfile.dominant_color} - ${computedProfile.secondary_color}`
-              : 'Profil calculé'}
-          </Text>
-          <Text style={styles.profileNote}>
-            L'affichage détaillé du profil sera implémenté dans la phase suivante
-          </Text>
-        </View>
+        <ProfileDisplay profile={computedProfile} />
       )}
     </ScrollView>
   );
@@ -373,32 +370,6 @@ const styles = StyleSheet.create({
     color: '#0b1120',
     fontSize: 16,
     fontWeight: '700',
-  },
-  profileContainer: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  profileTitle: {
-    color: '#f9fafb',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  profileSubtitle: {
-    color: '#22c55e',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    textTransform: 'capitalize',
-  },
-  profileNote: {
-    color: '#9ca3af',
-    fontSize: 14,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
 });
 
