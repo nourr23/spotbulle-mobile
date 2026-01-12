@@ -35,3 +35,4 @@ export async function getLumiProfile({ userId }: GetLumiProfileParams): Promise<
   return data as LumiProfile | null;
 }
 
+
