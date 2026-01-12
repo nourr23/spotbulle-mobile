@@ -6,6 +6,7 @@ import AgeSelector from '@/components/lumi/AgeSelector';
 import QuestionCard, { Question } from '@/components/lumi/QuestionCard';
 import ProgressIndicator from '@/components/lumi/ProgressIndicator';
 import ProfileDisplay, { LumiProfile } from '@/components/lumi/ProfileDisplay';
+import HobbyFlow from '@/components/lumi/HobbyFlow';
 import { startLumiSession, submitAnswer, computeProfile, getLumiProfile } from '@/services/api/lumi';
 
 export default function DiscScreen() {
@@ -289,7 +290,10 @@ export default function DiscScreen() {
 
       {/* Profile Results */}
       {computedProfile && (
-        <ProfileDisplay profile={computedProfile} />
+        <>
+          <ProfileDisplay profile={computedProfile} />
+          <HobbyFlow computedProfile={computedProfile} ageRange={ageRange} />
+        </>
       )}
     </ScrollView>
   );
