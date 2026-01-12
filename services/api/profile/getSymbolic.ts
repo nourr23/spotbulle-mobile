@@ -43,3 +43,4 @@ export async function getSymbolicProfile({ userId }: GetSymbolicProfileParams): 
   return data as SymbolicProfile | null;
 }
 
+
