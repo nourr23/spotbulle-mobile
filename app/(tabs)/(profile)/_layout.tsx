@@ -28,6 +28,14 @@ export default function Layout() {
           headerTintColor: '#f9fafb',
         }} 
       />
+      <Stack.Screen 
+        name="disc" 
+        options={{ 
+          title: 'DISC Profile',
+          headerStyle: { backgroundColor: '#020617' },
+          headerTintColor: '#f9fafb',
+        }} 
+      />
     </Stack>
   );
 }

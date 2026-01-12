@@ -39,6 +39,14 @@ export default function ProfileScreen() {
           <IconSymbol name="person.fill" size={24} color="#0b1120" />
           <Text style={styles.buttonText}>Symbolique</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.push('/(tabs)/(profile)/disc')}
+        >
+          <IconSymbol name="sparkles" size={24} color="#0b1120" />
+          <Text style={styles.buttonText}>DISC</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
